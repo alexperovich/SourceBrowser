@@ -2,16 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Build.Construction;
-using Microsoft.CodeAnalysis;
-using Folder = Microsoft.SourceBrowser.HtmlGenerator.Folder<Microsoft.CodeAnalysis.Project>;
+using Folder = Microsoft.SourceBrowser.HtmlGenerator.Folder<Microsoft.SourceBrowser.HtmlGenerator.IProject>;
 
 namespace Microsoft.SourceBrowser.HtmlGenerator
 {
     partial class SolutionGenerator
     {
-        public void AddProjectsToSolutionExplorer(Folder root, IEnumerable<Project> projects)
+        public void AddProjectsToSolutionExplorer(Folder<IProject> root, IEnumerable<IProject> projects)
         {
-            if (!ProjectFilePath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
+            if (!SolutionFilePath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
@@ -19,7 +18,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             Dictionary<string, IEnumerable<string>> projectToSolutionFolderMap = null;
             if (!Configuration.FlattenSolutionExplorer)
             {
-                projectToSolutionFolderMap = GetProjectToSolutionFolderMap(ProjectFilePath);
+                projectToSolutionFolderMap = GetProjectToSolutionFolderMap(SolutionFilePath);
             }
 
             var processedAssemblyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -43,7 +42,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             }
         }
 
-        private void AddProjectToFolder(Folder root, Project project, Dictionary<string, IEnumerable<string>> projectToSolutionFolderMap)
+        private void AddProjectToFolder(Folder root, IProject project, Dictionary<string, IEnumerable<string>> projectToSolutionFolderMap)
         {
             var fullPath = project.FilePath;
             IEnumerable<string> folders = null;
@@ -55,7 +54,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             AddProjectToFolder(root, project, folders);
         }
 
-        private void AddProjectToFolder(Folder folder, Project project, IEnumerable<string> folders = null)
+        private void AddProjectToFolder(Folder<IProject> folder, IProject project, IEnumerable<string> folders = null)
         {
             if (folders == null || !folders.Any())
             {

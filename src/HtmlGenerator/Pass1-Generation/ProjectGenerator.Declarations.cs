@@ -21,7 +21,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
         /// <param name="positionInFile">Exact byte position in the HTML file stream being generated where the 16-char
         /// symbol ID starts, to later be back patched to 0000000000000000 if the symbol has no references.</param>
         public void AddDeclaredSymbol(
-            ISymbol declaredSymbol,
+            ISourceSymbol declaredSymbol,
             string symbolId,
             string documentRelativeFilePath,
             long positionInFile)
@@ -48,22 +48,21 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                 }
             }
 
-            AddDeclaredSymbolToRedirectMap(SymbolIDToListOfLocationsMap, symbolId, documentRelativeFilePath, positionInFile);
+            AddDeclaredSymbolToRedirectMap(symbolId, documentRelativeFilePath, positionInFile);
         }
 
-        public static void AddDeclaredSymbolToRedirectMap(
-            Dictionary<string, List<Tuple<string, long>>> symbolIDToListOfLocationsMap,
+        public void AddDeclaredSymbolToRedirectMap(
             string symbolId,
             string documentRelativeFilePath,
             long positionInFile)
         {
             List<Tuple<string, long>> bucket = null;
-            lock (symbolIDToListOfLocationsMap)
+            lock (SymbolIDToListOfLocationsMap)
             {
-                if (!symbolIDToListOfLocationsMap.TryGetValue(symbolId, out bucket))
+                if (!SymbolIDToListOfLocationsMap.TryGetValue(symbolId, out bucket))
                 {
                     bucket = new List<Tuple<string, long>>();
-                    symbolIDToListOfLocationsMap.Add(symbolId, bucket);
+                    SymbolIDToListOfLocationsMap.Add(symbolId, bucket);
                 }
             }
 

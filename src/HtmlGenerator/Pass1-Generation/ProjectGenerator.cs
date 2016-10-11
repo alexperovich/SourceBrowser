@@ -5,20 +5,17 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
 using Microsoft.SourceBrowser.Common;
 
 namespace Microsoft.SourceBrowser.HtmlGenerator
 {
-    public partial class ProjectGenerator
+    public abstract partial class ProjectGenerator
     {
-        private readonly string assemblyAttributesFileName;
-
-        public Project Project { get; private set; }
+        public IProject Project { get; }
         public Dictionary<string, List<Tuple<string, long>>> SymbolIDToListOfLocationsMap { get; private set; }
-        public Dictionary<ISymbol, string> DeclaredSymbols { get; private set; }
-        public Dictionary<ISymbol, ISymbol> BaseMembers { get; private set; }
-        public MultiDictionary<ISymbol, ISymbol> ImplementedInterfaceMembers { get; set; }
+        public Dictionary<ISourceSymbol, string> DeclaredSymbols { get; private set; }
+        public Dictionary<ISourceSymbol, ISourceSymbol> BaseMembers { get; private set; }
+        public MultiDictionary<ISourceSymbol, ISourceSymbol> ImplementedInterfaceMembers { get; set; }
 
         public string ProjectDestinationFolder { get; private set; }
         public string AssemblyName { get; private set; }
@@ -27,21 +24,20 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
         public string ProjectFilePath { get; private set; }
         public List<string> OtherFiles { get; set; }
 
-        public ProjectGenerator(SolutionGenerator solutionGenerator, Project project) : this()
+        protected ProjectGenerator(SolutionGenerator solutionGenerator, IProject project) : this()
         {
             this.SolutionGenerator = solutionGenerator;
             this.Project = project;
-            this.ProjectFilePath = project.FilePath ?? solutionGenerator.ProjectFilePath;
-            this.DeclaredSymbols = new Dictionary<ISymbol, string>();
-            this.BaseMembers = new Dictionary<ISymbol, ISymbol>();
-            this.ImplementedInterfaceMembers = new MultiDictionary<ISymbol, ISymbol>();
-            this.assemblyAttributesFileName = MetadataAsSource.GeneratedAssemblyAttributesFileName + (project.Language == LanguageNames.CSharp ? ".cs" : ".vb");
+            this.ProjectFilePath = project.FilePath ?? solutionGenerator.SolutionFilePath;
+            this.DeclaredSymbols = new Dictionary<ISourceSymbol, string>();
+            this.BaseMembers = new Dictionary<ISourceSymbol, ISourceSymbol>();
+            this.ImplementedInterfaceMembers = new MultiDictionary<ISourceSymbol, ISourceSymbol>();
         }
 
         /// <summary>
         /// This constructor is used for non-C#/VB projects such as "MSBuildFiles"
         /// </summary>
-        public ProjectGenerator(string folderName, string solutionDestinationFolder) : this()
+        protected ProjectGenerator(string folderName, string solutionDestinationFolder) : this()
         {
             ProjectDestinationFolder = Path.Combine(solutionDestinationFolder, folderName);
             Directory.CreateDirectory(Path.Combine(ProjectDestinationFolder, Constants.ReferencesFileName));
@@ -170,25 +166,20 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                 SymbolIDToListOfLocationsMap);
         }
 
-        private void GenerateNamespaceExplorer()
-        {
-            Log.Write("Namespace Explorer...");
-            var symbols = this.DeclaredSymbols.Keys.OfType<INamedTypeSymbol>()
-                .Select(s => new DeclaredSymbolInfo(s, this.AssemblyName));
-            NamespaceExplorer.WriteNamespaceExplorer(this.AssemblyName, symbols, ProjectDestinationFolder);
-        }
+        protected abstract void GenerateNamespaceExplorer();
 
-        private Task GenerateDocument(Document document)
+        protected abstract DocumentGenerator CreateDocumentGenerator(ProjectGenerator projectGenerator, IDocument document);
+
+        private async Task GenerateDocument(IDocument document)
         {
             try
             {
-                var documentGenerator = new DocumentGenerator(this, document);
-                return documentGenerator.Generate();
+                var documentGenerator = CreateDocumentGenerator(this, document);
+                await documentGenerator.GenerateAsync();
             }
             catch (Exception e)
             {
                 Log.Exception(e, "Document generation failed for: " + (document.FilePath ?? document.ToString()));
-                return Task.FromResult(e);
             }
         }
 
@@ -201,25 +192,12 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             File.WriteAllText(index, sb.ToString());
         }
 
-        private bool IsCSharp
+        protected virtual bool IncludeDocument(IDocument document)
         {
-            get
-            {
-                return Project.Language == LanguageNames.CSharp;
-            }
-        }
-
-        private bool IncludeDocument(Document document)
-        {
-            if (document.Name == assemblyAttributesFileName)
-            {
-                return false;
-            }
-
             return true;
         }
 
-        private string GetProjectDestinationPath(Project project, string solutionDestinationPath)
+        private string GetProjectDestinationPath(IProject project, string solutionDestinationPath)
         {
             var assemblyName = project.AssemblyName;
             if (assemblyName == "<Error>")

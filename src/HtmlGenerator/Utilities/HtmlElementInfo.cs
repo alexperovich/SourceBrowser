@@ -8,12 +8,16 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
         public string Name { get; set; }
         public Dictionary<string, string> Attributes { get; private set; }
 
-        public ISymbol DeclaredSymbol { get; set; }
+        public ISourceSymbol DeclaredSymbol { get; set; }
         public string DeclaredSymbolId { get; set; }
 
         public HtmlElementInfo()
         {
             Attributes = new Dictionary<string, string>();
         }
+    }
+
+    public interface ISourceSymbol
+    {
     }
 }

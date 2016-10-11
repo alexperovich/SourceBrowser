@@ -164,7 +164,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             return result.ToString();
         }
 
-        public static string GetRelativeFilePathInProject(Document document)
+        public static string GetRelativeFilePathInProject(IDocument document)
         {
             string result = Path.Combine(document.Folders
                 .Select(SanitizeFolder)

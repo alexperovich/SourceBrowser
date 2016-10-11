@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.SourceBrowser.Common;
@@ -64,9 +65,9 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                     continue;
                 }
 
-                if (arg.StartsWith("/p:"))
+                if (arg.StartsWith("/project:"))
                 {
-                    var match = Regex.Match(arg, "/p:(?<name>[^=]+)=(?<value>.+)");
+                    var match = Regex.Match(arg, "/project:(?<name>[^=]+)=(?<value>.+)");
                     if (match.Success)
                     {
                         var propertyName = match.Groups["name"].Value;
@@ -174,7 +175,8 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
 
             return filePath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase) ||
                    filePath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) ||
-                   filePath.EndsWith(".vbproj", StringComparison.OrdinalIgnoreCase);
+                   filePath.EndsWith(".vbproj", StringComparison.OrdinalIgnoreCase) ||
+                   filePath.EndsWith(".vcxproj", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void PrintUsage()
@@ -189,7 +191,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                 + @"[/assemblylist]");
         }
 
-        private static readonly Folder<Project> mergedSolutionExplorerRoot = new Folder<Project>();
+        private static readonly Folder<IProject> mergedSolutionExplorerRoot = new Folder<IProject>();
 
         private static void IndexSolutions(IEnumerable<string> solutionFilePaths, Dictionary<string, string> properties, Federation federation)
         {
@@ -219,6 +221,15 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                         solutionGenerator.GlobalAssemblyList = assemblyNames;
                         solutionGenerator.Generate(solutionExplorerRoot: mergedSolutionExplorerRoot);
                     }
+
+                    //using (var cppSolutionGenerator = new CppSolutionGenerator(
+                    //    path,
+                    //    Paths.SolutionDestinationFolder,
+                    //    properties.ToImmutableDictionary()))
+                    //{
+                    //    cppSolutionGenerator.GlobalAssemblyList = assemblyNames;
+                    //    cppSolutionGenerator.GenerateAsync(solutionExplorerRoot: mergedSolutionExplorerRoot).GetAwaiter().GetResult();
+                    //}
                 }
 
                 GC.Collect();
@@ -250,5 +261,69 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             var projectGenerator = new ProjectGenerator(projectName, solutionDestinationPath);
             projectGenerator.GenerateNonProjectFolder();
         }
+    }
+
+    public interface ISolution
+    {
+        IImmutableList<IProject> Projects { get; }
+        string FilePath { get; }
+    }
+
+    public interface IProject
+    {
+        string AssemblyName { get; }
+        string Name { get; }
+        string FilePath { get; }
+        string Id { get; }
+        IImmutableList<IDocument> Documents { get; }
+        ISolution Solution { get; }
+    }
+
+    public interface IDocument
+    {
+        string Name { get; }
+        string FilePath { get; }
+        IReadOnlyList<string> Folders { get; }
+        ISourceText Text { get; }
+        IProject Project { get; }
+    }
+
+    public interface ISourceText
+    {
+        IReadOnlyList<string> Lines { get; }
+    }
+
+    public class RoslynProject : IProject
+    {
+        private readonly Project _project;
+
+        public RoslynProject(Project project, ISolution solution)
+        {
+            Solution = solution;
+            _project = project;
+        }
+
+        public string AssemblyName => _project.AssemblyName;
+        public string Name => _project.Name;
+        public string FilePath => _project.FilePath;
+        public string Id => _project.Id.ToString();
+        public IImmutableList<IDocument> Documents => _project.Documents.Select(d => new RoslynDocument(d, this)).ToImmutableList<IDocument>();
+        public ISolution Solution { get; }
+    }
+
+    public class RoslynDocument : IDocument
+    {
+        public RoslynDocument(Document document, IProject project)
+        {
+            Document = document;
+            Project = project;
+        }
+
+        public string Name => Document.Name;
+        public string FilePath => Document.FilePath;
+        public IReadOnlyList<string> Folders => Document.Folders;
+        public ISourceText Text { get; }
+        public IProject Project { get; }
+        public Document Document { get; }
     }
 }

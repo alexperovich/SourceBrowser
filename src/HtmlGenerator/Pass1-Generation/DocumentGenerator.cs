@@ -1,77 +1,40 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.SourceBrowser.Common;
 
 namespace Microsoft.SourceBrowser.HtmlGenerator
 {
     public partial class DocumentGenerator
     {
-        public ProjectGenerator projectGenerator;
-        public Document Document;
+        public ProjectGenerator ProjectGenerator { get; }
+        public IDocument Document { get; }
+
         public string documentDestinationFilePath;
         public string relativePathToRoot;
         public string documentRelativeFilePathWithoutHtmlExtension;
 
         private Classification classifier;
 
-        public SourceText Text;
-        public SyntaxNode Root;
-        public SemanticModel SemanticModel;
-        public HashSet<ISymbol> DeclaredSymbols;
-        public object SemanticFactsService;
-        public object SyntaxFactsService;
-        private Func<SemanticModel, SyntaxNode, CancellationToken, bool> isWrittenToDelegate;
-        private Func<SyntaxToken, SyntaxNode> getBindableParentDelegate;
-
         public DocumentGenerator(
             ProjectGenerator projectGenerator,
-            Document document)
+            IDocument document)
         {
-            this.projectGenerator = projectGenerator;
+            this.ProjectGenerator = projectGenerator;
             this.Document = document;
         }
 
-        public async Task Generate()
+        public virtual async Task GenerateAsync()
         {
-            if (Configuration.CalculateRoslynSemantics)
-            {
-                this.Text = await Document.GetTextAsync();
-                this.Root = await Document.GetSyntaxRootAsync();
-                this.SemanticModel = await Document.GetSemanticModelAsync();
-                this.SemanticFactsService = WorkspaceHacks.GetSemanticFactsService(this.Document);
-                this.SyntaxFactsService = WorkspaceHacks.GetSyntaxFactsService(this.Document);
-
-                var semanticFactsServiceType = SemanticFactsService.GetType();
-                var isWrittenTo = semanticFactsServiceType.GetMethod("IsWrittenTo");
-                this.isWrittenToDelegate = (Func<SemanticModel, SyntaxNode, CancellationToken, bool>)
-                    Delegate.CreateDelegate(typeof(Func<SemanticModel, SyntaxNode, CancellationToken, bool>), SemanticFactsService, isWrittenTo);
-
-                var syntaxFactsServiceType = SyntaxFactsService.GetType();
-                var getBindableParent = syntaxFactsServiceType.GetMethod("GetBindableParent");
-                this.getBindableParentDelegate = (Func<SyntaxToken, SyntaxNode>)
-                    Delegate.CreateDelegate(typeof(Func<SyntaxToken, SyntaxNode>), SyntaxFactsService, getBindableParent);
-
-                this.DeclaredSymbols = new HashSet<ISymbol>();
-
-                Interlocked.Increment(ref projectGenerator.DocumentCount);
-                Interlocked.Add(ref projectGenerator.LinesOfCode, Text.Lines.Count);
-                Interlocked.Add(ref projectGenerator.BytesOfCode, Text.Length);
-            }
-
             CalculateDocumentDestinationPath();
             CalculateRelativePathToRoot();
 
             // add the file itself as a "declared symbol", so that clicking on document in search
             // results redirects to the document
-            ProjectGenerator.AddDeclaredSymbolToRedirectMap(
-                this.projectGenerator.SymbolIDToListOfLocationsMap,
+            this.ProjectGenerator.AddDeclaredSymbolToRedirectMap(
                 SymbolIdService.GetId(this.Document),
                 documentRelativeFilePathWithoutHtmlExtension,
                 0);

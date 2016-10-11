@@ -12,6 +12,7 @@
   <Import Project="..\..\Common.props" />
   <ItemGroup>
     <Reference Include="Microsoft.Build, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
+    <Reference Include="Microsoft.Build.Engine, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL" />
     <Reference Include="Microsoft.Build.Framework, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
     <Reference Include="Microsoft.Build.Tasks.Core, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
     <Reference Include="Microsoft.Build.Utilities.Core, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
@@ -164,6 +165,9 @@
     <Compile Include="Pass1-Generation\ProjectGenerator.ProjectFile.cs" />
     <Compile Include="Pass1-Generation\ProjectGenerator.ProjectInfo.cs" />
     <Compile Include="Pass1-Generation\ProjectGenerator.References.Pass1.cs" />
+    <Compile Include="Pass1-Generation\Roslyn\RoslynDocumentGenerator.cs" />
+    <Compile Include="Pass1-Generation\Roslyn\RoslynProjectGenerator.cs" />
+    <Compile Include="Pass1-Generation\Roslyn\RoslynSolutionGenerator.cs" />
     <Compile Include="Pass1-Generation\SolutionGenerator.cs" />
     <Compile Include="Pass1-Generation\SolutionGenerator.SolutionExplorer.cs" />
     <Compile Include="Pass1-Generation\TypeScriptSupport.AnalysisError.cs" />
@@ -1275,6 +1279,9 @@
   <ItemGroup>
     <Analyzer Include="..\..\packages\Microsoft.CodeAnalysis.Analyzers.1.1.0\analyzers\dotnet\cs\Microsoft.CodeAnalysis.Analyzers.dll" />
     <Analyzer Include="..\..\packages\Microsoft.CodeAnalysis.Analyzers.1.1.0\analyzers\dotnet\cs\Microsoft.CodeAnalysis.CSharp.Analyzers.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Pass1-Generation\CppSupport\" />
   </ItemGroup>
   <Target Name="BuildNuGet" AfterTargets="CoreBuild" Condition="Exists('$(NuSpecFile)')" DependsOnTargets="CopyFilesToOutputDirectory" Inputs="@(NuGetInput)" Outputs="$(OutDir)\Microsoft.SourceBrowser.$(NuGetVersion).nupkg">
     <Exec Command="&quot;$(SolutionDir)\.nuget\NuGet.exe&quot; Pack Microsoft.SourceBrowser.nuspec -NoPackageAnalysis -BasePath &quot;$(OutDir.TrimEnd('\'))&quot; -OutputDirectory &quot;$(OutDir.TrimEnd('\'))&quot; -prop currentVersion=$(NuGetVersion)" />

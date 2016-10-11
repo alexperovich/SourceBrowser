@@ -108,7 +108,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             return Paths.GetMD5HashULong(content, 16);
         }
 
-        public static string GetId(Document document)
+        public static string GetId(IDocument document)
         {
             var documentRelativePath = Paths.GetRelativeFilePathInProject(document);
             return GetId(documentRelativePath);
