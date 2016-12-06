@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using LibGit2Sharp;
 using Microsoft.SourceBrowser.MEF;
+using System.Runtime.ExceptionServices;
 
 namespace GitGlyph
 {
@@ -76,6 +77,7 @@ namespace GitGlyph
         /// Cache used to memoize the GetBlame method.
         /// </summary>
         private Dictionary<string, IEnumerable<BlameHunk>> getBlameResultCache = new Dictionary<string, IEnumerable<BlameHunk>>();
+        [HandleProcessCorruptedStateExceptions]
         private IEnumerable<BlameHunk> GetBlame(string path)
         {
             IEnumerable<BlameHunk> result;
@@ -89,13 +91,13 @@ namespace GitGlyph
                     }
                     else
                     {
-                        result = new BlameHunk[0];
+                        result = Array.Empty<BlameHunk>();
                     }
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("Couldn't blame " + path, ex);
-                    result = new BlameHunk[0];
+                    //Logger.Error("Couldn't blame " + path, ex);
+                    result = Array.Empty<BlameHunk>();
                 }
                 getBlameResultCache.Add(path, result);
             }
