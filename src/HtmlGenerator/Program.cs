@@ -15,6 +15,7 @@ using Microsoft.Build.Logging;
 using System.Reflection.PortableExecutable;
 using System.Reflection.Metadata;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace Microsoft.SourceBrowser.HtmlGenerator
 {
@@ -235,13 +236,16 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
 
             var typeForwards = new Dictionary<ValueTuple<string, string>, string>();
 
+            var domain = AppDomain.CreateDomain("TypeForwards");
             foreach (var path in solutionFilePaths)
             {
                 using (Disposable.Timing($"Reading type forwards from {path}"))
                 {
-                    GetTypeForwardsAsync(path, typeForwards).Wait();
+                    GetTypeForwards(path, typeForwards, domain);
                 }
             }
+            AppDomain.Unload(domain);
+            domain = null;
 
             foreach (var path in solutionFilePaths)
             {
@@ -266,104 +270,14 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             }
         }
 
-        private static async Task GetTypeForwardsAsync(string path, Dictionary<ValueTuple<string, string>, string> typeForwards)
+        private static void GetTypeForwards(string path, Dictionary<ValueTuple<string, string>, string> typeForwards, AppDomain domain)
         {
-            var workspace = MSBuildWorkspace.Create();
-            Solution solution;
-            if (path.EndsWith(".sln"))
+            var obj = (TypeForwardReader)domain.CreateInstanceFromAndUnwrap(Assembly.GetEntryAssembly().CodeBase, "Microsoft.SourceBrowser.HtmlGenerator.TypeForwardReader");
+            var forwards = obj.GetTypeForwards(path);
+            foreach (var forward in forwards)
             {
-                solution = await workspace.OpenSolutionAsync(path).ConfigureAwait(false);
+                typeForwards[ValueTuple.Create(forward.Item1, forward.Item2)] = forward.Item3;
             }
-            else
-            {
-                solution = (await workspace.OpenProjectAsync(path).ConfigureAwait(false)).Solution;
-            }
-
-            var projects = solution.Projects.Select(p => p.FilePath).ToList();
-            var assemblies = (await Task.WhenAll(projects.Select(GetAssemblyAsync))).Where(a => a != null).ToList();
-            foreach (var assemblyFile in assemblies)
-            {
-                var thisAssemblyName = Path.GetFileNameWithoutExtension(assemblyFile);
-                using (var peReader = new PEReader(File.ReadAllBytes(assemblyFile).ToImmutableArray()))
-                {
-                    var reader = peReader.GetMetadataReader();
-                    foreach (var exportedTypeHandle in reader.ExportedTypes)
-                    {
-                        var exportedType = reader.GetExportedType(exportedTypeHandle);
-                        ProcessExportedType(exportedType, reader, typeForwards, thisAssemblyName);
-                    }
-                }
-            }
-        }
-
-        private static string GetFullName(MetadataReader reader, ExportedType type)
-        {
-            Debug.Assert(type.IsForwarder);
-            if (type.Implementation.Kind == HandleKind.AssemblyReference)
-            {
-                var name = reader.GetString(type.Name);
-                var ns = type.Namespace.IsNil ? null : reader.GetString(type.Namespace);
-                var fullName = string.IsNullOrEmpty(ns) ? name : ns + "." + name;
-                return fullName;
-            }
-            if (type.Implementation.Kind == HandleKind.ExportedType)
-            {
-                var name = reader.GetString(type.Name);
-                Debug.Assert(type.Namespace.IsNil);
-                return GetFullName(reader, reader.GetExportedType((ExportedTypeHandle)type.Implementation)) + "." + name;
-            }
-            throw new NotSupportedException(type.Implementation.Kind.ToString());
-        }
-
-        private static string GetAssemblyName(MetadataReader reader, ExportedType type)
-        {
-            Debug.Assert(type.IsForwarder);
-            if (type.Implementation.Kind == HandleKind.AssemblyReference)
-            {
-                return reader.GetString(reader.GetAssemblyReference((AssemblyReferenceHandle)type.Implementation).Name);
-            }
-            if (type.Implementation.Kind == HandleKind.ExportedType)
-            {
-                return GetAssemblyName(reader, reader.GetExportedType((ExportedTypeHandle)type.Implementation));
-            }
-            throw new NotSupportedException(type.Implementation.Kind.ToString());
-        }
-
-        private static void ProcessExportedType(ExportedType exportedType, MetadataReader reader, Dictionary<ValueTuple<string, string>, string> typeForwards, string thisAssemblyName)
-        {
-            if (!exportedType.IsForwarder) return;
-            typeForwards[ValueTuple.Create(thisAssemblyName, "T:" + GetFullName(reader, exportedType))] = GetAssemblyName(reader, exportedType);
-        }
-
-        private static async Task<string> GetAssemblyAsync(string projectPath)
-        {
-            var collection = new ProjectCollection();
-
-            var project = collection.LoadProject(projectPath, new Dictionary<string, string>(), "14.0");
-            var instance = project.CreateProjectInstance();
-            var manager = new BuildManager();
-
-            var getTargetPathResult = manager.Build(new BuildParameters(), new BuildRequestData(instance, new[] { "GetTargetPath" }));
-            if (getTargetPathResult.HasResultsForTarget("GetTargetPath") && getTargetPathResult.ResultsByTarget["GetTargetPath"].ResultCode == TargetResultCode.Success)
-            {
-                var targetPath = getTargetPathResult.ResultsByTarget["GetTargetPath"].Items.Select(i => i.GetMetadata("FullPath")).First();
-                if (File.Exists(targetPath))
-                {
-                    return targetPath;
-                }
-            }
-
-            var buildResult = manager.Build(new BuildParameters
-            {
-                DisableInProcNode = true,
-                Loggers = new List<ILogger> { new ConsoleLogger(LoggerVerbosity.Quiet) },
-            },
-                new BuildRequestData(instance, new[] { "Build" }));
-            if (buildResult.HasResultsForTarget("Build") && buildResult.ResultsByTarget["Build"].ResultCode == TargetResultCode.Success)
-            {
-                return buildResult.ResultsByTarget["Build"].Items.Select(i => i.GetMetadata("FullPath")).First();
-            }
-            return null;
         }
 
         private static void FinalizeProjects(bool emitAssemblyList, Federation federation)

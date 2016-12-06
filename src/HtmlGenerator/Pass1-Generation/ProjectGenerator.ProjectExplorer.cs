@@ -116,7 +116,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                     url = "@" + externalIndex.ToString() + "@#" + reference;
                     sb.AppendLine(Markup.GetProjectExplorerReference(url, reference));
                 }
-                else if ((SolutionGenerator.IsPartOfSolution(reference) || reference.Contains("->")) && usedReferences.Contains(reference))
+                else if ((SolutionGenerator.IsPartOfSolution(reference) || (reference?.Contains("->") ?? false)) && usedReferences.Contains(reference))
                 {
                     sb.AppendLine(Markup.GetProjectExplorerReference(url, reference));
                 }
