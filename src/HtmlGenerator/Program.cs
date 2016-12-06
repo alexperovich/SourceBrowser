@@ -5,6 +5,16 @@ using System.IO;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.SourceBrowser.Common;
+using Microsoft.CodeAnalysis.MSBuild;
+using System.Threading.Tasks;
+using System.Linq;
+using Microsoft.Build.Evaluation;
+using Microsoft.Build.Execution;
+using Microsoft.Build.Framework;
+using Microsoft.Build.Logging;
+using System.Reflection.PortableExecutable;
+using System.Reflection.Metadata;
+using System.Diagnostics;
 
 namespace Microsoft.SourceBrowser.HtmlGenerator
 {
@@ -206,7 +216,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                 + @"[/assemblylist]");
         }
 
-        private static readonly Folder<Project> mergedSolutionExplorerRoot = new Folder<Project>();
+        private static readonly Folder<CodeAnalysis.Project> mergedSolutionExplorerRoot = new Folder<CodeAnalysis.Project>();
 
         private static void IndexSolutions(IEnumerable<string> solutionFilePaths, Dictionary<string, string> properties, Federation federation, Dictionary<string, string> serverPathMappings)
         {
@@ -223,6 +233,16 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                 }
             }
 
+            var typeForwards = new Dictionary<(string assemblyName, string typeName), string>();
+
+            foreach (var path in solutionFilePaths)
+            {
+                using (Disposable.Timing($"Reading type forwards from {path}"))
+                {
+                    GetTypeForwardsAsync(path, typeForwards).Wait();
+                }
+            }
+
             foreach (var path in solutionFilePaths)
             {
                 using (Disposable.Timing("Generating " + path))
@@ -232,7 +252,8 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                         Paths.SolutionDestinationFolder,
                         properties: properties.ToImmutableDictionary(),
                         federation: federation,
-                        serverPathMappings: serverPathMappings))
+                        serverPathMappings: serverPathMappings,
+                        typeForwards: typeForwards))
                     {
                         solutionGenerator.GlobalAssemblyList = assemblyNames;
                         solutionGenerator.Generate(solutionExplorerRoot: mergedSolutionExplorerRoot);
@@ -243,6 +264,104 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
             }
+        }
+
+        private static async Task GetTypeForwardsAsync(string path, Dictionary<(string assemblyName, string typeName), string> typeForwards)
+        {
+            var workspace = MSBuildWorkspace.Create();
+            Solution solution;
+            if (path.EndsWith(".sln"))
+            {
+                solution = await workspace.OpenSolutionAsync(path).ConfigureAwait(false);
+            }
+            else
+            {
+                solution = (await workspace.OpenProjectAsync(path).ConfigureAwait(false)).Solution;
+            }
+
+            var projects = solution.Projects.Select(p => p.FilePath).ToList();
+            var assemblies = (await Task.WhenAll(projects.Select(GetAssemblyAsync))).Where(a => a != null).ToList();
+            foreach (var assemblyFile in assemblies)
+            {
+                var thisAssemblyName = Path.GetFileNameWithoutExtension(assemblyFile);
+                using (var peReader = new PEReader(File.ReadAllBytes(assemblyFile).ToImmutableArray()))
+                {
+                    var reader = peReader.GetMetadataReader();
+                    foreach (var exportedTypeHandle in reader.ExportedTypes)
+                    {
+                        var exportedType = reader.GetExportedType(exportedTypeHandle);
+                        ProcessExportedType(exportedType, reader, typeForwards, thisAssemblyName);
+                    }
+                }
+            }
+        }
+
+        private static void ProcessExportedType(ExportedType exportedType, MetadataReader reader, Dictionary<(string assemblyName, string typeName), string> typeForwards, string thisAssemblyName)
+        {
+            if (!exportedType.IsForwarder) return;
+            string GetFullName(ExportedType type)
+            {
+                Debug.Assert(type.IsForwarder);
+                if (type.Implementation.Kind == HandleKind.AssemblyReference)
+                {
+                    var name = reader.GetString(type.Name);
+                    var ns = type.Namespace.IsNil ? null : reader.GetString(type.Namespace);
+                    var fullName = string.IsNullOrEmpty(ns) ? name : ns + "." + name;
+                    return fullName;
+                }
+                if (type.Implementation.Kind == HandleKind.ExportedType)
+                {
+                    var name = reader.GetString(type.Name);
+                    Debug.Assert(type.Namespace.IsNil);
+                    return GetFullName(reader.GetExportedType((ExportedTypeHandle)type.Implementation)) + "." + name;
+                }
+                throw new NotSupportedException(type.Implementation.Kind.ToString());
+            }
+            string GetAssemblyName(ExportedType type)
+            {
+                Debug.Assert(type.IsForwarder);
+                if (type.Implementation.Kind == HandleKind.AssemblyReference)
+                {
+                    return reader.GetString(reader.GetAssemblyReference((AssemblyReferenceHandle)type.Implementation).Name);
+                }
+                if (type.Implementation.Kind == HandleKind.ExportedType)
+                {
+                    return GetAssemblyName(reader.GetExportedType((ExportedTypeHandle)type.Implementation));
+                }
+                throw new NotSupportedException(type.Implementation.Kind.ToString());
+            }
+            typeForwards[(thisAssemblyName, "T:" + GetFullName(exportedType))] = GetAssemblyName(exportedType);
+        }
+
+        private static async Task<string> GetAssemblyAsync(string projectPath)
+        {
+            var collection = new ProjectCollection();
+
+            var project = collection.LoadProject(projectPath, new Dictionary<string, string>(), "14.0");
+            var instance = project.CreateProjectInstance();
+            var manager = new BuildManager();
+
+            var getTargetPathResult = manager.Build(new BuildParameters(), new BuildRequestData(instance, new[] { "GetTargetPath" }));
+            if (getTargetPathResult.HasResultsForTarget("GetTargetPath") && getTargetPathResult.ResultsByTarget["GetTargetPath"].ResultCode == TargetResultCode.Success)
+            {
+                var targetPath = getTargetPathResult.ResultsByTarget["GetTargetPath"].Items.Select(i => i.GetMetadata("FullPath")).First();
+                if (File.Exists(targetPath))
+                {
+                    return targetPath;
+                }
+            }
+
+            var buildResult = manager.Build(new BuildParameters
+            {
+                DisableInProcNode = true,
+                Loggers = new List<ILogger> { new ConsoleLogger(LoggerVerbosity.Quiet) },
+            },
+                new BuildRequestData(instance, new[] { "Build" }));
+            if (buildResult.HasResultsForTarget("Build") && buildResult.ResultsByTarget["Build"].ResultCode == TargetResultCode.Success)
+            {
+                return buildResult.ResultsByTarget["Build"].Items.Select(i => i.GetMetadata("FullPath")).First();
+            }
+            return null;
         }
 
         private static void FinalizeProjects(bool emitAssemblyList, Federation federation)

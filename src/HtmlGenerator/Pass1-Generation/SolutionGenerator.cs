@@ -13,6 +13,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
 {
     public partial class SolutionGenerator : IDisposable
     {
+        public ImmutableDictionary<string, string> Properties { get; }
         public string SolutionSourceFolder { get; private set; }
         public string SolutionDestinationFolder { get; private set; }
         public string ProjectFilePath { get; private set; }
@@ -22,6 +23,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
         private Federation Federation { get; set; }
         private readonly HashSet<string> typeScriptFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public MEF.PluginAggregator PluginAggregator;
+        public IReadOnlyDictionary<(string assemblyName, string typeName), string> TypeForwards { get; }
 
         /// <summary>
         /// List of all assembly names included in the index, from all solutions
@@ -37,7 +39,8 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             string serverPath = null,
             ImmutableDictionary<string, string> properties = null,
             Federation federation = null,
-            IReadOnlyDictionary<string, string> serverPathMappings = null)
+            IReadOnlyDictionary<string, string> serverPathMappings = null,
+            IReadOnlyDictionary<(string assemblyName, string typeName), string> typeForwards = null)
         {
             this.SolutionSourceFolder = Path.GetDirectoryName(solutionFilePath);
             this.SolutionDestinationFolder = solutionDestinationFolder;
@@ -46,7 +49,9 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             ServerPathMappings = serverPathMappings;
             this.solution = CreateSolution(solutionFilePath, properties);
             this.Federation = federation ?? new Federation();
+            this.Properties = properties;
             SetupPluginAggregator();
+            this.TypeForwards = typeForwards;
         }
 
         private void SetupPluginAggregator()
@@ -76,6 +81,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             string serverPath,
             string networkShare)
         {
+            this.Properties = ImmutableDictionary<string, string>.Empty;
             this.ProjectFilePath = projectFilePath;
             string projectName = Path.GetFileNameWithoutExtension(projectFilePath);
             string language = projectFilePath.EndsWith(".vbproj", StringComparison.OrdinalIgnoreCase) ?
