@@ -567,7 +567,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             }
 
             type = (ITypeSymbol)GetTypeFromSymbol(symbol);
-            var forwardKey = (type.ContainingAssembly.Name, (type?.OriginalDefinition ?? type).GetDocumentationCommentId());
+            var forwardKey = ValueTuple.Create(type.ContainingAssembly.Name, (type?.OriginalDefinition ?? type).GetDocumentationCommentId());
             string forwardedToAssembly;
             if (projectGenerator.SolutionGenerator.TypeForwards.TryGetValue(forwardKey, out forwardedToAssembly))
             {
