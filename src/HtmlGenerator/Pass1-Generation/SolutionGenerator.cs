@@ -23,7 +23,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
         private Federation Federation { get; set; }
         private readonly HashSet<string> typeScriptFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public MEF.PluginAggregator PluginAggregator;
-        public IReadOnlyDictionary<(string assemblyName, string typeName), string> TypeForwards { get; }
+        public IReadOnlyDictionary<ValueTuple<string, string>, string> TypeForwards { get; }
 
         /// <summary>
         /// List of all assembly names included in the index, from all solutions
@@ -40,7 +40,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             ImmutableDictionary<string, string> properties = null,
             Federation federation = null,
             IReadOnlyDictionary<string, string> serverPathMappings = null,
-            IReadOnlyDictionary<(string assemblyName, string typeName), string> typeForwards = null)
+            IReadOnlyDictionary<ValueTuple<string, string>, string> typeForwards = null)
         {
             this.SolutionSourceFolder = Path.GetDirectoryName(solutionFilePath);
             this.SolutionDestinationFolder = solutionDestinationFolder;

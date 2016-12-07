@@ -233,7 +233,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                 }
             }
 
-            var typeForwards = new Dictionary<(string assemblyName, string typeName), string>();
+            var typeForwards = new Dictionary<ValueTuple<string, string>, string>();
 
             foreach (var path in solutionFilePaths)
             {
@@ -266,7 +266,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             }
         }
 
-        private static async Task GetTypeForwardsAsync(string path, Dictionary<(string assemblyName, string typeName), string> typeForwards)
+        private static async Task GetTypeForwardsAsync(string path, Dictionary<ValueTuple<string, string>, string> typeForwards)
         {
             var workspace = MSBuildWorkspace.Create();
             Solution solution;
@@ -296,41 +296,43 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             }
         }
 
-        private static void ProcessExportedType(ExportedType exportedType, MetadataReader reader, Dictionary<(string assemblyName, string typeName), string> typeForwards, string thisAssemblyName)
+        private static string GetFullName(MetadataReader reader, ExportedType type)
+        {
+            Debug.Assert(type.IsForwarder);
+            if (type.Implementation.Kind == HandleKind.AssemblyReference)
+            {
+                var name = reader.GetString(type.Name);
+                var ns = type.Namespace.IsNil ? null : reader.GetString(type.Namespace);
+                var fullName = string.IsNullOrEmpty(ns) ? name : ns + "." + name;
+                return fullName;
+            }
+            if (type.Implementation.Kind == HandleKind.ExportedType)
+            {
+                var name = reader.GetString(type.Name);
+                Debug.Assert(type.Namespace.IsNil);
+                return GetFullName(reader, reader.GetExportedType((ExportedTypeHandle)type.Implementation)) + "." + name;
+            }
+            throw new NotSupportedException(type.Implementation.Kind.ToString());
+        }
+
+        private static string GetAssemblyName(MetadataReader reader, ExportedType type)
+        {
+            Debug.Assert(type.IsForwarder);
+            if (type.Implementation.Kind == HandleKind.AssemblyReference)
+            {
+                return reader.GetString(reader.GetAssemblyReference((AssemblyReferenceHandle)type.Implementation).Name);
+            }
+            if (type.Implementation.Kind == HandleKind.ExportedType)
+            {
+                return GetAssemblyName(reader, reader.GetExportedType((ExportedTypeHandle)type.Implementation));
+            }
+            throw new NotSupportedException(type.Implementation.Kind.ToString());
+        }
+
+        private static void ProcessExportedType(ExportedType exportedType, MetadataReader reader, Dictionary<ValueTuple<string, string>, string> typeForwards, string thisAssemblyName)
         {
             if (!exportedType.IsForwarder) return;
-            string GetFullName(ExportedType type)
-            {
-                Debug.Assert(type.IsForwarder);
-                if (type.Implementation.Kind == HandleKind.AssemblyReference)
-                {
-                    var name = reader.GetString(type.Name);
-                    var ns = type.Namespace.IsNil ? null : reader.GetString(type.Namespace);
-                    var fullName = string.IsNullOrEmpty(ns) ? name : ns + "." + name;
-                    return fullName;
-                }
-                if (type.Implementation.Kind == HandleKind.ExportedType)
-                {
-                    var name = reader.GetString(type.Name);
-                    Debug.Assert(type.Namespace.IsNil);
-                    return GetFullName(reader.GetExportedType((ExportedTypeHandle)type.Implementation)) + "." + name;
-                }
-                throw new NotSupportedException(type.Implementation.Kind.ToString());
-            }
-            string GetAssemblyName(ExportedType type)
-            {
-                Debug.Assert(type.IsForwarder);
-                if (type.Implementation.Kind == HandleKind.AssemblyReference)
-                {
-                    return reader.GetString(reader.GetAssemblyReference((AssemblyReferenceHandle)type.Implementation).Name);
-                }
-                if (type.Implementation.Kind == HandleKind.ExportedType)
-                {
-                    return GetAssemblyName(reader.GetExportedType((ExportedTypeHandle)type.Implementation));
-                }
-                throw new NotSupportedException(type.Implementation.Kind.ToString());
-            }
-            typeForwards[(thisAssemblyName, "T:" + GetFullName(exportedType))] = GetAssemblyName(exportedType);
+            typeForwards[ValueTuple.Create(thisAssemblyName, "T:" + GetFullName(reader, exportedType))] = GetAssemblyName(reader, exportedType);
         }
 
         private static async Task<string> GetAssemblyAsync(string projectPath)
