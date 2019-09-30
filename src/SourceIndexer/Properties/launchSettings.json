@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SourceIndexer": {
+      "commandName": "Project",
+      "commandLineArgs": "index-csharp --help"
+    }
+  }
+}

@@ -1,15 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26228.9
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29310.158
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HtmlGenerator", "src\HtmlGenerator\HtmlGenerator.csproj", "{3CB763A5-A0C0-46B0-AEF5-020E731253C2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HtmlGenerator", "src\HtmlGenerator\HtmlGenerator.csproj", "{3CB763A5-A0C0-46B0-AEF5-020E731253C2}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BuildLogParser", "src\BuildLogParser\BuildLogParser.csproj", "{57002F26-8D15-4CF7-A53D-61AE8CC5E836}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "src\Common\Common.csproj", "{F13CD277-E86B-4BC6-9E93-39ED055A46DB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitGlyph", "src\GitGlyph\GitGlyph.csproj", "{810A96AB-58EB-4403-9A1E-964F85958E62}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GitGlyph", "src\GitGlyph\GitGlyph.csproj", "{810A96AB-58EB-4403-9A1E-964F85958E62}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MEF", "src\MEF\MEF.csproj", "{E3411353-9F6B-4FB2-874E-106BF4896462}"
 EndProject
@@ -17,7 +17,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceIndexServer", "src\So
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HtmlGenerator.Tests", "src\HtmlGenerator.Tests\HtmlGenerator.Tests.csproj", "{4EDEE974-055C-455E-866F-4BDCB734CB59}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SourceIndexServer.Tests", "src\SourceIndexServer.Tests\SourceIndexServer.Tests.csproj", "{37B5A89F-5436-45BE-B782-C476086A6AF8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceIndexServer.Tests", "src\SourceIndexServer.Tests\SourceIndexServer.Tests.csproj", "{37B5A89F-5436-45BE-B782-C476086A6AF8}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceIndexer", "src\SourceIndexer\SourceIndexer.csproj", "{AAF4339C-2C21-4E12-AB86-5552BA0D2A01}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "V2", "V2", "{639EAE89-195A-4C3A-A093-FEF85C47876B}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceIndexer.Contracts", "src\V2\SourceIndexer.Contracts\SourceIndexer.Contracts.csproj", "{851646CB-EC5A-44EA-9C4D-09CF759C201C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SourceIndexer.Plugin.CSharp", "src\V2\SourceIndexer.Plugin.CSharp\SourceIndexer.Plugin.CSharp.csproj", "{C44E6332-42F5-4C1A-8FF3-42ACC72B3F17}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -57,8 +65,27 @@ Global
 		{37B5A89F-5436-45BE-B782-C476086A6AF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{37B5A89F-5436-45BE-B782-C476086A6AF8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{37B5A89F-5436-45BE-B782-C476086A6AF8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AAF4339C-2C21-4E12-AB86-5552BA0D2A01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AAF4339C-2C21-4E12-AB86-5552BA0D2A01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AAF4339C-2C21-4E12-AB86-5552BA0D2A01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AAF4339C-2C21-4E12-AB86-5552BA0D2A01}.Release|Any CPU.Build.0 = Release|Any CPU
+		{851646CB-EC5A-44EA-9C4D-09CF759C201C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{851646CB-EC5A-44EA-9C4D-09CF759C201C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{851646CB-EC5A-44EA-9C4D-09CF759C201C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{851646CB-EC5A-44EA-9C4D-09CF759C201C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C44E6332-42F5-4C1A-8FF3-42ACC72B3F17}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C44E6332-42F5-4C1A-8FF3-42ACC72B3F17}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C44E6332-42F5-4C1A-8FF3-42ACC72B3F17}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C44E6332-42F5-4C1A-8FF3-42ACC72B3F17}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{851646CB-EC5A-44EA-9C4D-09CF759C201C} = {639EAE89-195A-4C3A-A093-FEF85C47876B}
+		{C44E6332-42F5-4C1A-8FF3-42ACC72B3F17} = {639EAE89-195A-4C3A-A093-FEF85C47876B}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1CB1798E-7BF1-416B-9735-904318C67FBC}
 	EndGlobalSection
 EndGlobal

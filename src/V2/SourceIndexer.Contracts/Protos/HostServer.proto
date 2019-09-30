@@ -1,0 +1,86 @@
+﻿syntax = "proto3";
+
+package source_indexer.contracts;
+
+message Empty {
+}
+
+message StringValue {
+	string Value = 1;
+}
+
+service HostServer {
+	rpc Initialize (InitializeData) returns (RunParameters);
+	rpc WriteLog (LogMessage) returns (Empty);
+
+	rpc BeginProject (Project) returns (ProjectId);
+	rpc BeginFile (ProjectFile) returns (ProjectFileId);
+
+	rpc IndexSymbol (Symbol) returns (Empty);
+	rpc IndexToken (Token) returns (Empty);
+
+	rpc EndFile (ProjectFileId) returns (Empty);
+	rpc EndProject (ProjectId) returns (Empty);
+}
+
+message InitializeData {
+	map<string, ClassificationStyle> Styles = 1;
+}
+
+message ClassificationStyle {
+	string Color = 1;
+	string BackgroundColor = 2;
+	string FontWeight = 3;
+}
+
+message LogMessage {
+	int32 LogLevel = 1;
+	string Message = 2;
+	string ExceptionInfo = 3;
+}
+
+message RunParameters {
+	string Settings = 1;
+}
+
+message Project {
+	string Path = 2;
+}
+
+message ProjectId {
+	string Id = 1;
+}
+
+message ProjectFile {
+	string ProjectId = 1;
+	string Path = 2;
+	int32 LineCount = 3;
+	int32 Length = 4;
+}
+
+message ProjectFileId {
+	string Id = 1;
+}
+
+message Symbol {
+	string Name = 1;
+	string Kind = 2;
+}
+
+message SymbolRef {
+	string Name = 1;
+}
+
+message Token {
+	string ProjectFileId = 1;
+	SymbolRef DeclaredSymbol = 2;
+	SymbolRef ReferencedSymbol = 3;
+	string Text = 4;
+	string Classification = 5;
+}
+
+enum SymbolType {
+	Invalid = 0;
+	File = 1;
+}
+
