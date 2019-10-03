@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualBasic.CompilerServices;
 using SourceIndexer.Contracts;
 using SourceIndexer.IndexDatabase;
 
@@ -17,16 +18,13 @@ namespace SourceIndexer
     public class Indexer
     {
         private readonly ILanguageIndexerPlugin language;
-        private readonly IEnumerable<string> args;
         private readonly SourceIndexContext context;
-        private readonly string settings;
 
         public string LanguageName => language.Name;
 
-        private Indexer(SourceIndexContext context, ILanguageIndexerPlugin language, string settings)
+        private Indexer(SourceIndexContext context, ILanguageIndexerPlugin language)
         {
             this.language = language;
-            this.settings = settings;
             this.context = context;
         }
 
@@ -34,8 +32,8 @@ namespace SourceIndexer
         {
             await using var context = new SourceIndexContext(contextOptions);
 
-            var (indexPid, settings) = await language.LaunchIndexerProcessAsync($"http://localhost:{hostServer.Port}/", clientId.ToString(), args).ConfigureAwait(false);
-            var indexer = new Indexer(context, language, settings);
+            var indexPid = await language.LaunchIndexerProcessAsync($"http://localhost:{hostServer.Port}/", clientId.ToString(), args).ConfigureAwait(false);
+            var indexer = new Indexer(context, language);
             hostServer.RegisterIndexer(indexer, clientId);
 
             var process = Process.GetProcessById(indexPid);
@@ -87,7 +85,7 @@ namespace SourceIndexer
             }
         }
 
-        public async Task<RunParameters> Initialize(InitializeData request)
+        public async Task<Empty> Initialize(InitializeData request)
         {
             await ModifyDatabase(async () =>
             {
@@ -110,10 +108,7 @@ namespace SourceIndexer
 
             Volatile.Write(ref initialized, true);
 
-            return new RunParameters
-            {
-                Settings = settings,
-            };
+            return null!;
         }
 
         private readonly SemaphoreSlim projectLock = new SemaphoreSlim(1, 1);
@@ -136,6 +131,8 @@ namespace SourceIndexer
             public int NextDeclarationId => nextDeclarationId++;
             private int nextReferenceId = 1;
             public int NextReferenceId => nextReferenceId++;
+            private int nextImplementationId = 1;
+            public int NextImplementationId => nextImplementationId++;
         }
 
         public async Task<ProjectId> BeginProject(Project request)
@@ -283,33 +280,31 @@ namespace SourceIndexer
             return sha.ComputeHash(bytes);
         }
 
-        public async Task IndexSymbol(Symbol request)
+        private async ValueTask<byte[]> IndexSymbol(Symbol value)
         {
-            EnsureInitialized();
-            await ModifyDatabase(async () =>
+            var symbolName = NormalizeSymbolName(value.Name);
+            var symbolKind = NormalizeSymbolKind(value.Kind);
+            var symbolKey = GetSymbolKey(symbolName);
+            var symbol = await context.Symbols.FindAsync(symbolKey).ConfigureAwait(false);
+            if (symbol == null)
             {
-                var symbolName = NormalizeSymbolName(request.Name);
-                var symbolKind = NormalizeSymbolKind(request.Kind);
-                var symbolKey = GetSymbolKey(symbolName);
-                var symbol = await context.Symbols.FindAsync(symbolKey).ConfigureAwait(false);
-                if (symbol == null)
+                symbol = new IndexSymbol(symbolKey, symbolName, symbolKind);
+                context.Symbols.Add(symbol);
+            }
+            else
+            {
+                if (symbol.Name != symbolName)
                 {
-                    symbol = new IndexSymbol(symbolKey, symbolName, symbolKind);
-                    context.Symbols.Add(symbol);
+                    throw new InvalidOperationException("Different symbols same id");
                 }
-                else
+                if (symbol.Kind != symbolKind)
                 {
-                    if (symbol.Name != symbolName)
-                    {
-                        throw new InvalidOperationException("Different symbols same id");
-                    }
-                    if (symbol.Kind != symbolKind)
-                    {
-                        symbol.Kind = symbolKind;
-                        context.Symbols.Update(symbol);
-                    }
+                    symbol.Kind = symbolKind;
+                    context.Symbols.Update(symbol);
                 }
-            }).ConfigureAwait(false);
+            }
+
+            return symbolKey;
         }
 
         private string NormalizeSymbolName(string name)
@@ -354,24 +349,38 @@ namespace SourceIndexer
             if (request.DeclaredSymbol != null)
             {
                 var declarationId = currentFile.NextDeclarationId;
-                var symbolId = GetSymbolKey(NormalizeSymbolName(request.DeclaredSymbol.Name));
-                content.Append($" id='decl-{declarationId}'");
-                await ModifyDatabase(() =>
+                var symbol = request.DeclaredSymbol;
+                content.Append($" id='d-{declarationId}'");
+                await ModifyDatabase(async () =>
                 {
-                    context.Declarations.Add(new IndexDeclaration(symbolId, currentFile.File.Id, declarationId));
-                    return Task.CompletedTask;
+                    var symbolKey = await IndexSymbol(symbol).ConfigureAwait(false);
+                    context.Declarations.Add(new IndexDeclaration(symbolKey, currentFile.File.Id, declarationId));
                 }).ConfigureAwait(false);
             }
-            else if (request.ReferencedSymbol != null)
+            if (request.ReferencedSymbol != null)
             {
                 var referenceId = currentFile.NextReferenceId;
-                var symbolId = GetSymbolKey(NormalizeSymbolName(request.ReferencedSymbol.Name));
-                content.Append($" id='ref-{referenceId}'");
-                await ModifyDatabase(() =>
+                var symbol = request.ReferencedSymbol;
+                content.Append($" id='r-{referenceId}'");
+                await ModifyDatabase(async () =>
                 {
-                    context.References.Add(new IndexReference(symbolId, currentFile.File.Id, referenceId));
-                    return Task.CompletedTask;
+                    var symbolKey = await IndexSymbol(symbol).ConfigureAwait(false);
+                    context.References.Add(new IndexReference(symbolKey, currentFile.File.Id, referenceId));
                 }).ConfigureAwait(false);
+            }
+            if (request.ImplementedSymbols != null && request.ImplementedSymbols.Any())
+            {
+                foreach (var symbol in request.ImplementedSymbols)
+                {
+                    var implementationId = currentFile.NextImplementationId;
+                    content.Append($" id='i-{implementationId}'");
+                    await ModifyDatabase(async () =>
+                    {
+                        var symbolKey = await IndexSymbol(symbol).ConfigureAwait(false);
+                        context.Implementations.Add(new IndexImplementation(symbolKey, currentFile.File.Id,
+                            implementationId));
+                    }).ConfigureAwait(false);
+                }
             }
 
             content.Append($">{text}</span>");

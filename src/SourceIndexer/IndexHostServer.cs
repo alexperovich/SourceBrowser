@@ -130,7 +130,7 @@ namespace SourceIndexer
             return indexer;
         }
 
-        public override Task<RunParameters> Initialize(InitializeData request, ServerCallContext context)
+        public override Task<Empty> Initialize(InitializeData request, ServerCallContext context)
         {
             var indexer = GetIndexer(context);
             return indexer.Initialize(request);
@@ -146,13 +146,6 @@ namespace SourceIndexer
         {
             var indexer = GetIndexer(context);
             return indexer.BeginFile(request);
-        }
-
-        public override async Task<Empty> IndexSymbol(Symbol request, ServerCallContext context)
-        {
-            var indexer = GetIndexer(context);
-            await indexer.IndexSymbol(request).ConfigureAwait(false);
-            return null;
         }
 
         public override async Task<Empty> IndexToken(Token request, ServerCallContext context)

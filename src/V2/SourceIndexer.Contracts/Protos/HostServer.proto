@@ -10,13 +10,12 @@ message StringValue {
 }
 
 service HostServer {
-	rpc Initialize (InitializeData) returns (RunParameters);
+	rpc Initialize (InitializeData) returns (Empty);
 	rpc WriteLog (LogMessage) returns (Empty);
 
 	rpc BeginProject (Project) returns (ProjectId);
 	rpc BeginFile (ProjectFile) returns (ProjectFileId);
 
-	rpc IndexSymbol (Symbol) returns (Empty);
 	rpc IndexToken (Token) returns (Empty);
 
 	rpc EndFile (ProjectFileId) returns (Empty);
@@ -37,10 +36,6 @@ message LogMessage {
 	int32 LogLevel = 1;
 	string Message = 2;
 	string ExceptionInfo = 3;
-}
-
-message RunParameters {
-	string Settings = 1;
 }
 
 message Project {
@@ -67,16 +62,13 @@ message Symbol {
 	string Kind = 2;
 }
 
-message SymbolRef {
-	string Name = 1;
-}
-
 message Token {
 	string ProjectFileId = 1;
-	SymbolRef DeclaredSymbol = 2;
-	SymbolRef ReferencedSymbol = 3;
-	string Text = 4;
-	string Classification = 5;
+	Symbol DeclaredSymbol = 2;
+	Symbol ReferencedSymbol = 3;
+	repeated Symbol ImplementedSymbols = 4;
+	string Text = 5;
+	string Classification = 6;
 }
 
 enum SymbolType {
