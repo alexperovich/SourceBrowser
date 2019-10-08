@@ -196,15 +196,14 @@ namespace Test {
 
             foreach (var span in spans)
             {
-                Symbol? declaredSymbol = null;
-                Symbol? implementedSymbol = null;
-                Symbol? referencedSymbol = null;
+                Symbol? declaration = null;
+                List<Symbol> references = new List<Symbol>();
                 switch (span.ClassificationType)
                 {
                     case CSharpClassifications.Identifier:
                     case CSharpClassifications.TypeName:
-                        (declaredSymbol, implementedSymbol) = GetDeclaredAndImplementedSymbol(span, text, syntaxRoot, semanticModel); 
-                        if (declaredSymbol == null)
+                        (declaration, implementedSymbol) = GetDeclaration(span, text, syntaxRoot, semanticModel); 
+                        if (declaration == null)
                         {
                             goto case CSharpClassifications.Operator;
                         }
@@ -225,7 +224,7 @@ namespace Test {
                             Classification = span.ClassificationType,
                             ProjectFileId = fileId.Id,
                             Text = text.GetSubText(span.TextSpan).ToString(),
-                            DeclaredSymbol = declaredSymbol,
+                            DeclaredSymbol = declaration,
                             ImplementedSymbol = implementedSymbol,
                             ReferencedSymbol = referencedSymbol,
                         });
@@ -236,29 +235,60 @@ namespace Test {
             }
         }
 
-        private static (Symbol? declared, Symbol? implemented) GetDeclaredAndImplementedSymbol(ClassifiedSpan span, SourceText text, SyntaxNode syntaxRoot, SemanticModel semanticModel)
+        private static Symbol? GetDeclaration(ClassifiedSpan span, SourceText text, SyntaxNode syntaxRoot, SemanticModel semanticModel)
         {
             var token = syntaxRoot.FindToken(span.TextSpan.Start);
             var declaredSymbol = semanticModel.GetDeclaredSymbol(token.Parent);
 
             if (declaredSymbol == null)
             {
-                return (null, null);
+                return null;
             }
 
             if (declaredSymbol is IParameterSymbol parameter && parameter.IsThis)
             {
-                return (null, null);
+                return null;
             }
 
-            return (
-                new Symbol
-                {
-                    Name = declaredSymbol.GetDocumentationCommentId(),
+            if (declaredSymbol is INamedTypeSymbol && token.IsKind(SyntaxKind.PartialKeyword))
+            {
+                return null; // TODO: support partial
+            }
 
-                },
-                GetImplementedSymbol(declaredSymbol)
-            );
+            switch (declaredSymbol.Kind)
+            {
+                case SymbolKind.Event:
+                case SymbolKind.Field:
+                case SymbolKind.Method:
+                case SymbolKind.NamedType:
+                case SymbolKind.Property:
+                case SymbolKind.Namespace:
+                    return new Symbol
+                    {
+                        Name = declaredSymbol.GetDocumentationCommentId(),
+                        Kind = declaredSymbol.Kind.ToString(),
+                    };
+                case SymbolKind.Local:
+                case SymbolKind.Parameter:
+                case SymbolKind.TypeParameter:
+
+
+                    return null; // TODO: do the right thing
+                case SymbolKind.Alias:
+                case SymbolKind.ArrayType:
+                case SymbolKind.Assembly:
+                case SymbolKind.DynamicType:
+                case SymbolKind.ErrorType:
+                case SymbolKind.Label:
+                case SymbolKind.NetModule:
+                case SymbolKind.PointerType:
+                case SymbolKind.RangeVariable:
+                case SymbolKind.Preprocessing:
+                case SymbolKind.Discard:
+                    return null;
+                default:
+                    throw new NotSupportedException($"SymbolKind: '{declaredSymbol.Kind}'");
+            }
         }
 
         private static Symbol? GetImplementedSymbol(ISymbol symbol)

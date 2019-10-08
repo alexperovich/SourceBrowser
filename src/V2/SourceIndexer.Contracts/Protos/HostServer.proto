@@ -62,13 +62,24 @@ message Symbol {
 	string Kind = 2;
 }
 
+enum ReferenceKind {
+	None = 0;
+    MemberAccess = 1;
+    Override = 2;
+    Implementation = 3;
+}
+
+message SymbolRef {
+	Symbol Symbol = 1;
+	ReferenceKind Kind = 2;
+}
+
 message Token {
 	string ProjectFileId = 1;
 	Symbol DeclaredSymbol = 2;
-	Symbol ReferencedSymbol = 3;
-	repeated Symbol ImplementedSymbols = 4;
-	string Text = 5;
-	string Classification = 6;
+	repeated SymbolRef ReferencedSymbols = 3;
+	string Text = 4;
+	string Classification = 5;
 }
 
 enum SymbolType {

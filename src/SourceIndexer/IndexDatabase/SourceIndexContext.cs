@@ -29,7 +29,6 @@ namespace SourceIndexer.IndexDatabase
         public DbSet<IndexSymbol> Symbols { get; set; } = null!;
         public DbSet<IndexDeclaration> Declarations { get; set; } = null!;
         public DbSet<IndexReference> References { get; set; } = null!;
-        public DbSet<IndexImplementation> Implementations { get; set; } = null!;
         public DbSet<IndexStyle> Styles { get; set; } = null!;
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -84,13 +83,13 @@ namespace SourceIndexer.IndexDatabase
                 {
                     ifs.SymbolId,
                     ifs.FileId,
+                    ifs.FileDeclarationId,
                 });
 
             modelBuilder.Entity<IndexDeclaration>()
                 .HasIndex(ifs => new
                 {
                     ifs.FileId,
-                    ifs.SymbolId,
                 });
 
             modelBuilder.Entity<IndexSymbol>()
@@ -104,33 +103,14 @@ namespace SourceIndexer.IndexDatabase
                 {
                     r.SymbolId,
                     r.FileId,
+                    r.FileReferenceId,
+                    r.ReferenceKind,
                 });
 
             modelBuilder.Entity<IndexReference>()
                 .HasIndex(r => new
                 {
                     r.FileId,
-                    r.SymbolId,
-                });
-
-            modelBuilder.Entity<IndexSymbol>()
-                .HasMany(s => s.Implementations)
-                .WithOne(i => i.Symbol)
-                .HasForeignKey(i => i.SymbolId)
-                .HasPrincipalKey(s => s.Id);
-
-            modelBuilder.Entity<IndexImplementation>()
-                .HasKey(r => new
-                {
-                    r.SymbolId,
-                    r.FileId,
-                });
-
-            modelBuilder.Entity<IndexImplementation>()
-                .HasIndex(r => new
-                {
-                    r.FileId,
-                    r.SymbolId,
                 });
         }
 
