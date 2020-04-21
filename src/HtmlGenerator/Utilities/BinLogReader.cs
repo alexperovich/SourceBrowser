@@ -2,8 +2,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Microsoft.Build.Framework;
 using Microsoft.CodeAnalysis;
+using Microsoft.SourceBrowser.Common;
 using CompilerInvocation = Microsoft.SourceBrowser.HtmlGenerator.GenerateFromBuildLog.CompilerInvocation;
 
 namespace Microsoft.SourceBrowser.HtmlGenerator
@@ -149,19 +151,51 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
 
         public static string TrimCompilerExeFromCommandLine(string commandLine, CompilerKind language)
         {
-            int occurrence = -1;
-            if (language == CompilerKind.CSharp)
+
+            var stringsToTrim = new[]
             {
-                occurrence = commandLine.IndexOf("csc.exe ", StringComparison.OrdinalIgnoreCase);
-            }
-            else if (language == CompilerKind.VisualBasic)
+                "csc.exe ",
+                "vbc.exe ",
+                "dotnet exec csc.dll ",
+                "dotnet.exe exec csc.dll",
+                "dotnet exec vbc.dll ",
+                "dotnet.exe exec vbc.dll",
+            };
+
+            foreach (var trim in stringsToTrim)
             {
-                occurrence = commandLine.IndexOf("vbc.exe ", StringComparison.OrdinalIgnoreCase);
+                if (commandLine.StartsWith(trim))
+                {
+                    return commandLine.Substring(trim.Length);
+                }
             }
 
-            if (occurrence > -1)
+            var i1 = commandLine.IndexOf("dotnet.exe", StringComparison.Ordinal);
+            var i2 = commandLine.IndexOf(" exec ", StringComparison.Ordinal);
+            var i3 = commandLine.IndexOf("csc.dll", StringComparison.Ordinal);
+            if (i3 == -1)
             {
-                commandLine = commandLine.Substring(occurrence + "csc.exe ".Length);
+                i3 = commandLine.IndexOf("vbc.dll", StringComparison.Ordinal);
+            }
+
+            if (i1 != -1 &&
+                i2 != -1 &&
+                i3 != -1 &&
+                i1 < i2 &&
+                i2 < i3)
+            {
+                var i = i3 + "csc.dll".Length;
+                if (commandLine[i] == '"')
+                {
+                    i++;
+                }
+
+                while (i < commandLine.Length && commandLine[i] == ' ')
+                {
+                    i++;
+                }
+
+                return commandLine.Substring(i);
             }
 
             return commandLine;

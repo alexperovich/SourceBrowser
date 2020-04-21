@@ -307,6 +307,14 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             var domain = AppDomain.CreateDomain("TypeForwards");
             foreach (var path in solutionFilePaths)
             {
+                if (path.EndsWith(".binlog", StringComparison.OrdinalIgnoreCase) ||
+                    path.EndsWith(".buildlog", StringComparison.OrdinalIgnoreCase) ||
+                    path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ||
+                    path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                    )
+                {
+                    continue;
+                }
                 using (Disposable.Timing($"Reading type forwards from {path}"))
                 {
                     GetTypeForwards(path, properties, typeForwards, domain);
@@ -325,6 +333,12 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                         var invocations = BinLogCompilerInvocationsReader.ExtractInvocations(path);
                         foreach (var invocation in invocations)
                         {
+                            if (Path.GetFileName(invocation.ProjectDirectory) == "ref")
+                            {
+                                Log.Write($"Skipping Ref Assembly project {invocation.ProjectFilePath}");
+                                continue;
+                            }
+                            Log.Write($"Indexing Project: {invocation.ProjectFilePath}");
                             GenerateFromBuildLog.GenerateInvocation(
                                 invocation,
                                 serverPathMappings,

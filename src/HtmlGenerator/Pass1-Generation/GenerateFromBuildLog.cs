@@ -204,6 +204,11 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
                     return parsed;
                 }
             }
+
+            public override string ToString()
+            {
+                return CommandLineArguments;
+            }
         }
     }
 }

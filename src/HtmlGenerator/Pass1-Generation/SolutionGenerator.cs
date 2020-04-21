@@ -54,7 +54,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             this.Federation = federation ?? new Federation();
             this.PluginBlacklist = pluginBlacklist ?? Enumerable.Empty<string>();
             this.Properties = properties;
-            this.TypeForwards = typeForwards;
+            this.TypeForwards = typeForwards ?? ImmutableDictionary<ValueTuple<string, string>, string>.Empty;
 
             if (LoadPlugins)
             {
@@ -96,7 +96,8 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             string solutionSourceFolder,
             string solutionDestinationFolder,
             string serverPath,
-            string networkShare)
+            string networkShare,
+            IReadOnlyDictionary<ValueTuple<string, string>, string> typeForwards = null)
         {
             this.Properties = ImmutableDictionary<string, string>.Empty;
             this.ProjectFilePath = projectFilePath;
@@ -107,6 +108,7 @@ namespace Microsoft.SourceBrowser.HtmlGenerator
             this.SolutionDestinationFolder = solutionDestinationFolder;
             this.ServerPath = serverPath;
             this.NetworkShare = networkShare;
+            this.TypeForwards = typeForwards ?? ImmutableDictionary<ValueTuple<string, string>, string>.Empty;
             string projectSourceFolder = Path.GetDirectoryName(projectFilePath);
             SetupPluginAggregator();
 
